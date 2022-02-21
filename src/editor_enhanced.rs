@@ -3,6 +3,9 @@ use bevy::render::primitives::Aabb;
 use bevy_editor_pls::default_windows::add::*;
 use bevy_rapier3d::prelude::*;
 
+#[derive(Component)]
+pub struct ColliderAdded;
+
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct TmpColliderType {

@@ -3,6 +3,7 @@ use bevy_rapier3d::prelude::*;
 
 use crate::debug_line;
 use crate::follower;
+use crate::editor_enhanced;
 
 #[derive(Component)]
 pub struct Player;
@@ -73,7 +74,8 @@ pub fn setup(
         })
         .insert(RigidBodyPositionSync::Discrete)
         .insert(follower::FollowerTarget)
-        .insert(Player);
+        .insert(Player)
+        .insert(editor_enhanced::ColliderAdded);
 
     // debug line
     commands
@@ -172,7 +174,7 @@ pub fn apply_forces(
 
         // Apply impulses.
         // rb_vel.apply_impulse(rb_mprops, Vec3::new(100.0, 200.0, 300.0).into());
-        rb_vel.apply_impulse(rb_mprops, torque.into());
+        // rb_vel.apply_impulse(rb_mprops, torque.into());
 
         // torque is applyed around the 'torque' axis
         rb_vel.apply_torque_impulse(rb_mprops, torque.into()); //Vec3::new(140.0, 80.0, 20.0).into());

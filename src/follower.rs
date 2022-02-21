@@ -24,7 +24,7 @@ pub struct Position {
 impl Position {
     pub fn update(&mut self, h_angle: f32, up: Vec3, v_angle: f32, right: Vec3) -> &Self {
         self.to_camera = Quat::from_axis_angle(right, v_angle)
-            * Quat::from_axis_angle(up, h_angle)
+            * Quat::from_axis_angle(up, -h_angle)
             * self.to_camera;
         self
     }

@@ -1,95 +1,107 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+// use bevy_rapier3d::prelude::*;
+
+use crate::animated_shader;
 
 pub fn setup_level(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    // mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let scale = 10.0;
 
-    // plane
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: scale })),
-            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShape::cuboid(scale / 2.0, 0.1, scale / 2.0).into(),
-            ..Default::default()
-        });
+    commands.spawn().insert_bundle((
+        meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 10.0 })),
+        Transform::from_xyz(1.0, 4.0, 1.0),
+        // GlobalTransform::default(),
+        animated_shader::CustomMaterial,
+        Visibility::default(),
+        ComputedVisibility::default(),
+    ));
 
-    // walls
-    let wall = meshes.add(Mesh::from(bevy::prelude::shape::Box::new(scale, 4.0, 1.0)));
-    let material = materials.add(Color::rgb(0.3, 0.5, 0.3).into());
-    // top_wall
-    let position = Vec3::new(0.0, 0.0, -scale / 2.0);
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: wall.clone(),
-            material: material.clone(),
-            transform: Transform::from_translation(position),
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShape::cuboid(scale / 2.0, 2.0, 0.5).into(),
-            position: position.into(),
-            ..Default::default()
-        });
+    // let scale = 10.0;
 
-    // bottom wall
-    let position = Vec3::new(0.0, 0.0, scale / 2.0);
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: wall.clone(),
-            material: material.clone(),
-            transform: Transform::from_translation(position),
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShape::cuboid(scale / 2.0, 2.0, 0.5).into(),
-            position: position.into(),
-            ..Default::default()
-        });
-
-    // right wall
-    let position = Vec3::new(scale / 2.0, 0.0, 0.0);
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: wall.clone(),
-            material: material.clone(),
-            transform: Transform {
-                translation: position,
-                rotation: Quat::from_rotation_y(90.0_f32.to_radians()),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShape::cuboid(0.5, 2.0, scale / 2.0).into(),
-            position: position.into(),
-            ..Default::default()
-        });
-
-    // left wall
-    let position = Vec3::new(-scale / 2.0, 0.0, 0.0);
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: wall.clone(),
-            material: material.clone(),
-            transform: Transform {
-                translation: position,
-                rotation: Quat::from_rotation_y(90.0_f32.to_radians()),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShape::cuboid(0.5, 2.0, scale / 2.0).into(),
-            position: position.into(),
-            ..Default::default()
-        });
+    // // plane
+    // commands
+    //     .spawn_bundle(PbrBundle {
+    //         mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: scale })),
+    //         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+    //         ..Default::default()
+    //     })
+    //     .insert_bundle(ColliderBundle {
+    //         shape: ColliderShape::cuboid(scale / 2.0, 0.1, scale / 2.0).into(),
+    //         ..Default::default()
+    //     });
+    //
+    // // walls
+    // let wall = meshes.add(Mesh::from(bevy::prelude::shape::Box::new(scale, 4.0, 1.0)));
+    // let material = materials.add(Color::rgb(0.3, 0.5, 0.3).into());
+    // // top_wall
+    // let position = Vec3::new(0.0, 0.0, -scale / 2.0);
+    // commands
+    //     .spawn_bundle(PbrBundle {
+    //         mesh: wall.clone(),
+    //         material: material.clone(),
+    //         transform: Transform::from_translation(position),
+    //         ..Default::default()
+    //     })
+    //     .insert_bundle(ColliderBundle {
+    //         shape: ColliderShape::cuboid(scale / 2.0, 2.0, 0.5).into(),
+    //         position: position.into(),
+    //         ..Default::default()
+    //     });
+    //
+    // // bottom wall
+    // let position = Vec3::new(0.0, 0.0, scale / 2.0);
+    // commands
+    //     .spawn_bundle(PbrBundle {
+    //         mesh: wall.clone(),
+    //         material: material.clone(),
+    //         transform: Transform::from_translation(position),
+    //         ..Default::default()
+    //     })
+    //     .insert_bundle(ColliderBundle {
+    //         shape: ColliderShape::cuboid(scale / 2.0, 2.0, 0.5).into(),
+    //         position: position.into(),
+    //         ..Default::default()
+    //     });
+    //
+    // // right wall
+    // let position = Vec3::new(scale / 2.0, 0.0, 0.0);
+    // commands
+    //     .spawn_bundle(PbrBundle {
+    //         mesh: wall.clone(),
+    //         material: material.clone(),
+    //         transform: Transform {
+    //             translation: position,
+    //             rotation: Quat::from_rotation_y(90.0_f32.to_radians()),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .insert_bundle(ColliderBundle {
+    //         shape: ColliderShape::cuboid(0.5, 2.0, scale / 2.0).into(),
+    //         position: position.into(),
+    //         ..Default::default()
+    //     });
+    //
+    // // left wall
+    // let position = Vec3::new(-scale / 2.0, 0.0, 0.0);
+    // commands
+    //     .spawn_bundle(PbrBundle {
+    //         mesh: wall.clone(),
+    //         material: material.clone(),
+    //         transform: Transform {
+    //             translation: position,
+    //             rotation: Quat::from_rotation_y(90.0_f32.to_radians()),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .insert_bundle(ColliderBundle {
+    //         shape: ColliderShape::cuboid(0.5, 2.0, scale / 2.0).into(),
+    //         position: position.into(),
+    //         ..Default::default()
+    //     });
 
     // sensor
     // let sensor = meshes.add(Mesh::from(bevy::prelude::shape::Box::new(
