@@ -6,16 +6,17 @@ use bevy_editor_pls::prelude::*;
 use bevy_rapier3d::prelude::*;
 // use heron::prelude::*;
 
+mod animated_shader;
 mod debug_line;
 mod editor_enhanced;
 mod follower;
 mod level;
 mod player;
-mod animated_shader;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugin(animated_shader::CustomMaterialPlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(EntityCountDiagnosticsPlugin)
         .add_plugin(EditorPlugin)
@@ -37,10 +38,7 @@ fn main() {
         .run();
 }
 
-fn load_scene(
-    asset_server: Res<AssetServer>,
-    mut scene_spawner: ResMut<SceneSpawner>,
-) {
+fn load_scene(asset_server: Res<AssetServer>, mut scene_spawner: ResMut<SceneSpawner>) {
     let my_gltf = asset_server.load("scene.glb#Scene0");
     scene_spawner.spawn(my_gltf);
     asset_server.watch_for_changes().unwrap();

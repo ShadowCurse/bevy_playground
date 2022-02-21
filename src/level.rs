@@ -10,9 +10,9 @@ pub fn setup_level(
 ) {
 
     commands.spawn().insert_bundle((
-        meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 10.0 })),
-        Transform::from_xyz(1.0, 4.0, 1.0),
-        // GlobalTransform::default(),
+        meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 })),
+        Transform::from_xyz(1.0, 2.0, 1.0),
+        GlobalTransform::default(),
         animated_shader::CustomMaterial,
         Visibility::default(),
         ComputedVisibility::default(),
