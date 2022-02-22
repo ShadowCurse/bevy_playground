@@ -13,6 +13,8 @@ struct Vertex {
 struct VertexOutput {
     [[builtin(position)]] clip_position: vec4<f32>;
     [[location(0)]] uv: vec2<f32>;
+    [[location(1)]] world_position: vec3<f32>;
+    [[location(2)]] normal: vec3<f32>;
 };
 
 [[stage(vertex)]]
@@ -22,6 +24,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = view.view_proj * world_position;
     out.uv = vertex.uv;
+    out.world_position = world_position.xyz;
+    out.normal = vertex.normal;
     return out;
 }
 
@@ -55,18 +59,30 @@ fn oklab_to_linear_srgb(c: vec3<f32>) -> vec3<f32> {
 
 [[stage(fragment)]]
 fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    let speed = 2.0;
-    let t_1 = sin(time.time_since_startup * speed) * 0.5 + 0.5;
-    let t_2 = cos(time.time_since_startup * speed);
+    //let speed = 2.0;
+    //let t_1 = sin(time.time_since_startup * speed) * 0.5 + 0.5;
+    //let t_2 = cos(time.time_since_startup * speed);
 
-    let distance_to_center = distance(in.uv, vec2<f32>(0.5)) * 1.4;
+    //let distance_to_center = distance(in.uv, vec2<f32>(0.5)) * 1.4;
 
-    // blending is done in a perceptual color space: https://bottosson.github.io/posts/oklab/
-    let red = vec3<f32>(0.627955, 0.224863, 0.125846);
-    let green = vec3<f32>(0.86644, -0.233887, 0.179498);
-    let blue = vec3<f32>(0.701674, 0.274566, -0.169156);
-    let white = vec3<f32>(1.0, 0.0, 0.0);
-    let mixed = mix(mix(red, blue, t_1), mix(green, white, t_2), distance_to_center);
+    //// blending is done in a perceptual color space: https://bottosson.github.io/posts/oklab/
+    //let red = vec3<f32>(0.627955, 0.224863, 0.125846);
+    //let green = vec3<f32>(0.86644, -0.233887, 0.179498);
+    //let blue = vec3<f32>(0.701674, 0.274566, -0.169156);
+    //let white = vec3<f32>(1.0, 0.0, 0.0);
+    //let mixed = mix(mix(red, blue, t_1), mix(green, white, t_2), distance_to_center);
 
-    return vec4<f32>(oklab_to_linear_srgb(mixed), 1.0);
+    //return vec4<f32>(oklab_to_linear_srgb(mixed), 1.0);
+  
+    let light_dir = normalize(point_lights.data[0].position_radius.xyz - in.world_position);
+
+    let diffuse = dot(in.normal, light_dir);
+
+    let delta = fwidth(diffuse) * 1.0;
+    let diffuse_smooth = smoothStep(0.0, delta, diffuse);
+
+    //let result = vec3<f32>(0.9, 0.1, 0.1) * (diffuse_smooth * point_lights.data[0].color_inverse_square_range.rgb + vec3<f32>(0.1, 0.1, 0.9));
+    let result = vec3<f32>(0.9, 0.1, 0.1) * (diffuse_smooth * vec3<f32>(0.9, 0.9, 0.9) + vec3<f32>(0.1, 0.1, 0.9));
+
+    return vec4<f32>(result, 1.0);
 }
