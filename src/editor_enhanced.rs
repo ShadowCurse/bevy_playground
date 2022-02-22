@@ -109,7 +109,7 @@ pub fn collider_components(
         )
         .into(),
         (
-            global_transform.translation + transform.translation,
+            global_transform.translation,
             global_transform.rotation * transform.rotation,
         )
             .into(),

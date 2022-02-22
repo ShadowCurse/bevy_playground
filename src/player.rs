@@ -1,9 +1,10 @@
 use bevy::prelude::*;
+use bevy_mod_picking::{PickableBundle, PickingCameraBundle};
 use bevy_rapier3d::prelude::*;
 
 use crate::debug_line;
-use crate::follower;
 use crate::editor_enhanced;
+use crate::follower;
 
 #[derive(Component)]
 pub struct Player;
@@ -38,7 +39,8 @@ pub fn setup(
                 distance: 20.0,
                 to_camera: Vec3::new(1.0, 1.0, 0.0).normalize(),
             },
-        });
+        })
+        .insert_bundle(PickingCameraBundle::default());
 
     // player
     commands
@@ -75,7 +77,8 @@ pub fn setup(
         .insert(RigidBodyPositionSync::Discrete)
         .insert(follower::FollowerTarget)
         .insert(Player)
-        .insert(editor_enhanced::ColliderAdded);
+        .insert(editor_enhanced::ColliderAdded)
+        .insert_bundle(PickableBundle::default());
 
     // debug line
     commands
