@@ -45,10 +45,7 @@ pub fn setup(
     // player
     commands
         .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(bevy::prelude::shape::Icosphere {
-                radius: 0.5,
-                subdivisions: 1,
-            })),
+            mesh: meshes.add(Mesh::from(bevy::prelude::shape::Box::new(1.0, 2.0, 1.0))),
             material: materials.add(StandardMaterial {
                 base_color: Color::rgb(0.8, 0.7, 0.6),
                 perceptual_roughness: 1.0,
@@ -58,12 +55,25 @@ pub fn setup(
         })
         .insert_bundle(RigidBodyBundle {
             position: Vec3::new(0.0, 10.0, 0.0).into(),
+            mass_properties: RigidBodyMassPropsComponent(RigidBodyMassProps {
+                flags: RigidBodyMassPropsFlags::ROTATION_LOCKED,
+                ..Default::default()
+            }),
+            damping: RigidBodyDampingComponent(RigidBodyDamping {
+                linear_damping: 10.0,
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
-            shape: ColliderShape::ball(0.5).into(),
+            shape: ColliderShape::capsule(
+                Vec3::new(0.0, 1.0, 0.0).into(),
+                Vec3::new(0.0, -1.0, 0.0).into(),
+                0.5,
+            )
+            .into(),
             material: ColliderMaterial {
-                friction: 2.0,
+                friction: 20.0,
                 restitution: 0.7,
                 ..Default::default()
             }
@@ -72,6 +82,7 @@ pub fn setup(
                 active_events: ActiveEvents::INTERSECTION_EVENTS,
                 ..Default::default()
             }),
+            // mass_properties: ColliderMassPropsComponent(ColliderMassProps::Density(0.5)),
             ..Default::default()
         })
         .insert(RigidBodyPositionSync::Discrete)
@@ -79,18 +90,6 @@ pub fn setup(
         .insert(Player)
         .insert(editor_enhanced::ColliderAdded)
         .insert_bundle(PickableBundle::default());
-
-    // debug line
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(debug_line::DebugLine::default())),
-            material: materials.add(StandardMaterial {
-                emissive: Color::rgb(1.0, 0.0, 0.0),
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
-        .insert(debug_line::DebugLineMarker);
 
     // light
     commands
@@ -124,55 +123,50 @@ pub fn apply_forces(
     keys: Res<Input<KeyCode>>,
     mut rigid_bodies: Query<
         (
-            // &mut RigidBodyForcesComponent,
+            &mut RigidBodyForcesComponent,
             &mut RigidBodyVelocityComponent,
             &RigidBodyMassPropsComponent,
+            &Transform,
         ),
         With<Player>,
     >,
     camera: Query<&follower::FollowerPosition, With<Camera>>,
-
-    mut meshes: ResMut<Assets<Mesh>>,
-    debug_line: Query<&Handle<Mesh>, With<debug_line::DebugLineMarker>>,
 ) {
-    let line_handle = debug_line.single();
-
     let position = camera.single();
     let mut forward = -position.current_position.to_camera;
     forward.y = 0.0;
     forward = forward.normalize();
     let right = forward.cross(Vec3::Y);
 
-    if let Some(m) = meshes.get_mut(line_handle) {
-        *m = debug_line::DebugLine {
-            start: Vec3::new(0.0, forward.y, 0.0),
-            end: forward * 10.0,
-        }
-        .into()
-    }
-
-    let torque_mul = 0.01;
+    let torque_mul = 50.0;
     let mut torque = Vec3::default();
     if keys.pressed(KeyCode::W) {
-        torque = -right * torque_mul;
+        torque = forward * torque_mul;
     }
     if keys.pressed(KeyCode::S) {
-        torque = right * torque_mul;
-    }
-    if keys.pressed(KeyCode::A) {
         torque = -forward * torque_mul;
     }
+    if keys.pressed(KeyCode::A) {
+        torque = -right * torque_mul;
+    }
     if keys.pressed(KeyCode::D) {
-        torque = forward * torque_mul;
+        torque = right * torque_mul;
     }
     let mut jump = false;
     if keys.just_pressed(KeyCode::Space) {
         jump = true
     }
 
-    for (mut rb_vel, rb_mprops) in rigid_bodies.iter_mut() {
+    let height = 3.0;
+    let spring_str = 25.0;
+
+    for (mut rb_forces, mut rb_vel, rb_mprops, t) in rigid_bodies.iter_mut() {
+        let diff = height - t.translation.y;
+
+        let spring_force = diff * spring_str * Vec3::Y;
+
         // Apply forces.
-        // rb_forces.force = Vec3::new(1.0, 2.0, 3.0).into();
+        rb_forces.force = (torque + spring_force).into();
         // rb_forces.torque = torque.into();
 
         // Apply impulses.
@@ -180,7 +174,7 @@ pub fn apply_forces(
         // rb_vel.apply_impulse(rb_mprops, torque.into());
 
         // torque is applyed around the 'torque' axis
-        rb_vel.apply_torque_impulse(rb_mprops, torque.into()); //Vec3::new(140.0, 80.0, 20.0).into());
+        // rb_vel.apply_torque_impulse(rb_mprops, torque.into()); //Vec3::new(140.0, 80.0, 20.0).into());
 
         if jump {
             rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, 2.0, 0.0).into());
