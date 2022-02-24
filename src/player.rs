@@ -1,19 +1,26 @@
 use bevy::prelude::*;
 use bevy_mod_picking::{PickableBundle, PickingCameraBundle};
+use bevy_mod_raycast::{DefaultPluginState, DefaultRaycastingPlugin, RayCastSource};
 use bevy_rapier3d::prelude::*;
 
-use crate::debug_line;
-use crate::editor_enhanced;
 use crate::follower;
+
+pub struct PlayerPlugin;
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugin(DefaultRaycastingPlugin::<Player>::default())
+            .insert_resource(DefaultPluginState::<Player>::default())
+            .add_startup_system(setup_camera)
+            .add_startup_system(setup_player)
+            .add_system(apply_forces);
+    }
+}
 
 #[derive(Component)]
 pub struct Player;
 
-pub fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+pub fn setup_camera(mut commands: Commands) {
     commands.insert_resource(follower::FollowerController {
         follower_id: 0,
         rotation_speed: 3.0,
@@ -41,7 +48,13 @@ pub fn setup(
             },
         })
         .insert_bundle(PickingCameraBundle::default());
+}
 
+pub fn setup_player(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     // player
     commands
         .spawn_bundle(PbrBundle {
@@ -60,7 +73,7 @@ pub fn setup(
                 ..Default::default()
             }),
             damping: RigidBodyDampingComponent(RigidBodyDamping {
-                linear_damping: 10.0,
+                linear_damping: 30.0,
                 ..Default::default()
             }),
             ..Default::default()
@@ -72,50 +85,34 @@ pub fn setup(
                 0.5,
             )
             .into(),
-            material: ColliderMaterial {
-                friction: 20.0,
-                restitution: 0.7,
-                ..Default::default()
-            }
-            .into(),
-            flags: ColliderFlagsComponent(ColliderFlags {
-                active_events: ActiveEvents::INTERSECTION_EVENTS,
-                ..Default::default()
-            }),
-            // mass_properties: ColliderMassPropsComponent(ColliderMassProps::Density(0.5)),
+            // material: ColliderMaterial {
+            //     friction: 20.0,
+            //     restitution: 0.7,
+            //     ..Default::default()
+            // }
+            // .into(),
+            // flags: ColliderFlagsComponent(ColliderFlags {
+            //     active_events: ActiveEvents::INTERSECTION_EVENTS,
+            //     ..Default::default()
+            // }),
+            mass_properties: ColliderMassPropsComponent(ColliderMassProps::Density(0.5)),
             ..Default::default()
         })
         .insert(RigidBodyPositionSync::Discrete)
         .insert(follower::FollowerTarget)
         .insert(Player)
-        .insert(editor_enhanced::ColliderAdded)
-        .insert_bundle(PickableBundle::default());
-
-    // light
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 1500.0,
-                shadows_enabled: true,
-                ..Default::default()
-            },
-            transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            ..Default::default()
-        })
-        .insert(follower::Follower {
-            id: 1,
-            f_type: follower::FollowerType::Follow,
-        })
-        .insert(follower::FollowerConfig {
-            transition_time: 1.5,
-            up_direction: Vec3::Y,
-        })
-        .insert(follower::FollowerPosition {
-            position_state: follower::PositionState::Normal,
-            current_position: follower::Position {
-                distance: 5.0,
-                to_camera: Vec3::new(1.0, 1.0, 0.0).normalize(),
-            },
+        .insert_bundle(PickableBundle::default())
+        // ray caster
+        .with_children(|command| {
+            command
+                .spawn()
+                .insert(GlobalTransform::default())
+                // originally ray points to -z direction
+                // so we rotate it 90 degrees
+                .insert(Transform::from_rotation(Quat::from_rotation_x(
+                    -90.0_f32.to_radians(),
+                )))
+                .insert(RayCastSource::<Player>::new_transform_empty());
         });
 }
 
@@ -126,11 +123,11 @@ pub fn apply_forces(
             &mut RigidBodyForcesComponent,
             &mut RigidBodyVelocityComponent,
             &RigidBodyMassPropsComponent,
-            &Transform,
         ),
         With<Player>,
     >,
     camera: Query<&follower::FollowerPosition, With<Camera>>,
+    ray: Query<&RayCastSource<Player>>,
 ) {
     let position = camera.single();
     let mut forward = -position.current_position.to_camera;
@@ -138,35 +135,38 @@ pub fn apply_forces(
     forward = forward.normalize();
     let right = forward.cross(Vec3::Y);
 
-    let torque_mul = 50.0;
-    let mut torque = Vec3::default();
+    let force_str = 500.0;
+    let mut force = Vec3::default();
     if keys.pressed(KeyCode::W) {
-        torque = forward * torque_mul;
+        force = forward * force_str;
     }
     if keys.pressed(KeyCode::S) {
-        torque = -forward * torque_mul;
+        force = -forward * force_str;
     }
     if keys.pressed(KeyCode::A) {
-        torque = -right * torque_mul;
+        force = -right * force_str;
     }
     if keys.pressed(KeyCode::D) {
-        torque = right * torque_mul;
+        force = right * force_str;
     }
     let mut jump = false;
     if keys.just_pressed(KeyCode::Space) {
         jump = true
     }
 
-    let height = 3.0;
-    let spring_str = 25.0;
+    let height = 2.0;
+    let spring_str = 500.0;
 
-    for (mut rb_forces, mut rb_vel, rb_mprops, t) in rigid_bodies.iter_mut() {
-        let diff = height - t.translation.y;
-
-        let spring_force = diff * spring_str * Vec3::Y;
+    for (mut rb_forces, mut rb_vel, rb_mprops) in rigid_bodies.iter_mut() {
+        let ray = ray.single();
+        if let Some(top_intersection) = ray.intersect_top() {
+            let diff = height - top_intersection.1.distance();
+            let spring_force = diff * spring_str * Vec3::Y;
+            rb_forces.force = spring_force.into();
+        }
 
         // Apply forces.
-        rb_forces.force = (torque + spring_force).into();
+        rb_forces.force += Vector::from(force);
         // rb_forces.torque = torque.into();
 
         // Apply impulses.
@@ -177,7 +177,7 @@ pub fn apply_forces(
         // rb_vel.apply_torque_impulse(rb_mprops, torque.into()); //Vec3::new(140.0, 80.0, 20.0).into());
 
         if jump {
-            rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, 2.0, 0.0).into());
+            rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, 200.0, 0.0).into());
         }
     }
 }

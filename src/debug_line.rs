@@ -1,8 +1,5 @@
 use bevy::prelude::*;
-use bevy::render::{
-    mesh::{Indices, Mesh},
-    render_resource::PrimitiveTopology,
-};
+use bevy::render::{mesh::Mesh, render_resource::PrimitiveTopology};
 
 #[derive(Component)]
 pub struct DebugLineMarker;
@@ -29,4 +26,3 @@ impl From<DebugLine> for Mesh {
         mesh
     }
 }
-

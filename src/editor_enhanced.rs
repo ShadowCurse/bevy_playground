@@ -3,9 +3,6 @@ use bevy::render::primitives::Aabb;
 use bevy_editor_pls::default_windows::add::*;
 use bevy_rapier3d::prelude::*;
 
-#[derive(Component)]
-pub struct ColliderAdded;
-
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct TmpColliderType {
@@ -13,12 +10,12 @@ pub struct TmpColliderType {
     pub sensor: bool,
 }
 
-impl Into<ColliderType> for &TmpColliderType {
-    fn into(self) -> ColliderType {
-        if self.solid {
-            ColliderType::Solid
+impl From<&TmpColliderType> for ColliderType {
+    fn from(t: &TmpColliderType) -> Self {
+        if t.solid {
+            Self::Solid
         } else {
-            ColliderType::Sensor
+            Self::Sensor
         }
     }
 }
@@ -32,16 +29,16 @@ pub struct TmpRigidBodyType {
     pub kinematic_velocity_based: bool,
 }
 
-impl Into<RigidBodyType> for &TmpRigidBodyType {
-    fn into(self) -> RigidBodyType {
-        if self.dynamic {
-            RigidBodyType::Dynamic
-        } else if self.static_ {
-            RigidBodyType::Static
-        } else if self.kinematic_position_based {
-            RigidBodyType::KinematicPositionBased
+impl From<&TmpRigidBodyType> for RigidBodyType {
+    fn from(t: &TmpRigidBodyType) -> Self {
+        if t.dynamic {
+            Self::Dynamic
+        } else if t.static_ {
+            Self::Static
+        } else if t.kinematic_position_based {
+            Self::KinematicPositionBased
         } else {
-            RigidBodyType::KinematicVelocityBased
+            Self::KinematicVelocityBased
         }
     }
 }
@@ -50,9 +47,9 @@ impl Into<RigidBodyType> for &TmpRigidBodyType {
 #[reflect(Component)]
 pub struct TmpRigidBodyPosition(Vec3);
 
-impl Into<RigidBodyPosition> for &TmpRigidBodyPosition {
-    fn into(self) -> RigidBodyPosition {
-        self.0.into()
+impl From<&TmpRigidBodyPosition> for RigidBodyPosition {
+    fn from(p: &TmpRigidBodyPosition) -> Self {
+        p.0.into()
     }
 }
 
