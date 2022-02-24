@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use bevy::prelude::*;
 use bevy_mod_picking::{PickableBundle, PickingCameraBundle};
 use bevy_mod_raycast::{DefaultPluginState, DefaultRaycastingPlugin, RayCastSource};
@@ -11,6 +13,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(DefaultRaycastingPlugin::<Player>::default())
             .insert_resource(DefaultPluginState::<Player>::default())
+            .register_type::<PlayerColliderSettings>()
             .add_startup_system(setup_camera)
             .add_startup_system(setup_player)
             .add_system(apply_forces);
@@ -19,6 +22,18 @@ impl Plugin for PlayerPlugin {
 
 #[derive(Component)]
 pub struct Player;
+
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct PlayerColliderSettings {
+    pub ride_height: f32,
+    pub force_str: f32,
+    pub spring_str: f32,
+    pub spring_damper: f32,
+    pub upright_spring_str: f32,
+    pub upright_spring_damper: f32,
+    pub jump_str: f32,
+}
 
 pub fn setup_camera(mut commands: Commands) {
     commands.insert_resource(follower::FollowerController {
@@ -68,14 +83,19 @@ pub fn setup_player(
         })
         .insert_bundle(RigidBodyBundle {
             position: Vec3::new(0.0, 10.0, 0.0).into(),
-            mass_properties: RigidBodyMassPropsComponent(RigidBodyMassProps {
-                flags: RigidBodyMassPropsFlags::ROTATION_LOCKED,
+            // mass_properties: RigidBodyMassPropsComponent(RigidBodyMassProps {
+            //     flags: RigidBodyMassPropsFlags::ROTATION_LOCKED,
+            //     ..Default::default()
+            // }),
+            forces: RigidBodyForces {
+                gravity_scale: 0.0,
                 ..Default::default()
-            }),
-            damping: RigidBodyDampingComponent(RigidBodyDamping {
-                linear_damping: 30.0,
-                ..Default::default()
-            }),
+            }
+            .into(),
+            // damping: RigidBodyDampingComponent(RigidBodyDamping {
+            //     linear_damping: 1.0,
+            //     ..Default::default()
+            // }),
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
@@ -95,12 +115,21 @@ pub fn setup_player(
             //     active_events: ActiveEvents::INTERSECTION_EVENTS,
             //     ..Default::default()
             // }),
-            mass_properties: ColliderMassPropsComponent(ColliderMassProps::Density(0.5)),
+            // mass_properties: ColliderMassPropsComponent(ColliderMassProps::Density(0.5)),
             ..Default::default()
         })
         .insert(RigidBodyPositionSync::Discrete)
         .insert(follower::FollowerTarget)
         .insert(Player)
+        .insert(PlayerColliderSettings {
+            ride_height: 2.0,
+            force_str: 10.0,
+            spring_str: 10.0,
+            spring_damper: 1.0,
+            upright_spring_str: 20.0,
+            upright_spring_damper: 5.0,
+            jump_str: 10.0,
+        })
         .insert_bundle(PickableBundle::default())
         // ray caster
         .with_children(|command| {
@@ -123,6 +152,7 @@ pub fn apply_forces(
             &mut RigidBodyForcesComponent,
             &mut RigidBodyVelocityComponent,
             &RigidBodyMassPropsComponent,
+            &PlayerColliderSettings,
         ),
         With<Player>,
     >,
@@ -135,49 +165,52 @@ pub fn apply_forces(
     forward = forward.normalize();
     let right = forward.cross(Vec3::Y);
 
-    let force_str = 500.0;
     let mut force = Vec3::default();
     if keys.pressed(KeyCode::W) {
-        force = forward * force_str;
+        force = forward;
     }
     if keys.pressed(KeyCode::S) {
-        force = -forward * force_str;
+        force = -forward;
     }
     if keys.pressed(KeyCode::A) {
-        force = -right * force_str;
+        force = -right;
     }
     if keys.pressed(KeyCode::D) {
-        force = right * force_str;
+        force = right;
     }
     let mut jump = false;
     if keys.just_pressed(KeyCode::Space) {
         jump = true
     }
 
-    let height = 2.0;
-    let spring_str = 500.0;
-
-    for (mut rb_forces, mut rb_vel, rb_mprops) in rigid_bodies.iter_mut() {
+    for (mut rb_forces, mut rb_vel, rb_mprops, settings) in rigid_bodies.iter_mut() {
         let ray = ray.single();
         if let Some(top_intersection) = ray.intersect_top() {
-            let diff = height - top_intersection.1.distance();
-            let spring_force = diff * spring_str * Vec3::Y;
+            let vel = rb_vel.deref().linvel;
+            let ray_dir = ray.ray().unwrap().direction();
+
+            let relative_vel = ray_dir.dot(vel.into());
+
+            let diff = settings.ride_height - top_intersection.1.distance();
+            let spring_force =
+                (diff * settings.spring_str + relative_vel * settings.spring_damper) * Vec3::Y;
+            // Flaating
             rb_forces.force = spring_force.into();
         }
 
-        // Apply forces.
-        rb_forces.force += Vector::from(force);
-        // rb_forces.torque = torque.into();
+        // Movement
+        rb_forces.force += Vector::from(force * settings.force_str);
 
-        // Apply impulses.
-        // rb_vel.apply_impulse(rb_mprops, Vec3::new(100.0, 200.0, 300.0).into());
-        // rb_vel.apply_impulse(rb_mprops, torque.into());
-
-        // torque is applyed around the 'torque' axis
-        // rb_vel.apply_torque_impulse(rb_mprops, torque.into()); //Vec3::new(140.0, 80.0, 20.0).into());
+        let player_up = -ray.ray().unwrap().direction();
+        let rotation = Quat::from_rotation_arc_colinear(player_up, Vec3::Y);
+        let (axis, angle) = rotation.to_axis_angle();
+        let ang_vel: Vec3 = rb_vel.deref().angvel.into();
+        let torque = axis * angle * settings.upright_spring_str - ang_vel * settings.upright_spring_damper;
+        // Staing upright
+        rb_forces.torque = torque.into();
 
         if jump {
-            rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, 200.0, 0.0).into());
+            rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, settings.jump_str, 0.0).into());
         }
     }
 }
