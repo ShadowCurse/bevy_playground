@@ -1,5 +1,4 @@
 use std::ops::Deref;
-
 use bevy::prelude::*;
 use bevy_mod_picking::{PickableBundle, PickingCameraBundle};
 use bevy_mod_raycast::{DefaultPluginState, DefaultRaycastingPlugin, RayCastSource};
@@ -13,7 +12,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(DefaultRaycastingPlugin::<Player>::default())
             .insert_resource(DefaultPluginState::<Player>::default())
-            .register_type::<PlayerColliderSettings>()
+            .register_type::<PlayerControllerSettings>()
             .add_startup_system(setup_camera)
             .add_startup_system(setup_player)
             .add_system(apply_forces);
@@ -25,13 +24,17 @@ pub struct Player;
 
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
-pub struct PlayerColliderSettings {
+pub struct PlayerControllerSettings {
+    pub max_speed: f32,
+    pub acceleration: f32,
+    pub max_accel_force: f32,
     pub ride_height: f32,
     pub force_str: f32,
     pub spring_str: f32,
     pub spring_damper: f32,
     pub upright_spring_str: f32,
     pub upright_spring_damper: f32,
+    pub rotate_str: f32,
     pub jump_str: f32,
 }
 
@@ -121,13 +124,17 @@ pub fn setup_player(
         .insert(RigidBodyPositionSync::Discrete)
         .insert(follower::FollowerTarget)
         .insert(Player)
-        .insert(PlayerColliderSettings {
+        .insert(PlayerControllerSettings {
+            max_speed: 10.0,
+            acceleration: 10.0,
+            max_accel_force: 10.0,
             ride_height: 2.0,
             force_str: 10.0,
             spring_str: 10.0,
             spring_damper: 1.0,
             upright_spring_str: 20.0,
             upright_spring_damper: 5.0,
+            rotate_str: 10.0,
             jump_str: 10.0,
         })
         .insert_bundle(PickableBundle::default())
@@ -152,7 +159,8 @@ pub fn apply_forces(
             &mut RigidBodyForcesComponent,
             &mut RigidBodyVelocityComponent,
             &RigidBodyMassPropsComponent,
-            &PlayerColliderSettings,
+            &PlayerControllerSettings,
+            &Transform,
         ),
         With<Player>,
     >,
@@ -183,7 +191,7 @@ pub fn apply_forces(
         jump = true
     }
 
-    for (mut rb_forces, mut rb_vel, rb_mprops, settings) in rigid_bodies.iter_mut() {
+    for (mut rb_forces, mut rb_vel, rb_mprops, settings, t) in rigid_bodies.iter_mut() {
         let ray = ray.single();
         if let Some(top_intersection) = ray.intersect_top() {
             let vel = rb_vel.deref().linvel;
@@ -194,7 +202,7 @@ pub fn apply_forces(
             let diff = settings.ride_height - top_intersection.1.distance();
             let spring_force =
                 (diff * settings.spring_str + relative_vel * settings.spring_damper) * Vec3::Y;
-            // Flaating
+            // Floating
             rb_forces.force = spring_force.into();
         }
 
@@ -205,9 +213,18 @@ pub fn apply_forces(
         let rotation = Quat::from_rotation_arc_colinear(player_up, Vec3::Y);
         let (axis, angle) = rotation.to_axis_angle();
         let ang_vel: Vec3 = rb_vel.deref().angvel.into();
-        let torque = axis * angle * settings.upright_spring_str - ang_vel * settings.upright_spring_damper;
-        // Staing upright
-        rb_forces.torque = torque.into();
+        // Staing upright rotation
+        let upright_torque =
+            axis * angle * settings.upright_spring_str - ang_vel * settings.upright_spring_damper;
+
+        let player_forward = t.rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0));
+        let rotation = Quat::from_rotation_arc(player_forward, forward);
+        let (axis, angle) = rotation.to_axis_angle();
+        // Forward rotation
+        let rotate_torque = axis * angle * settings.rotate_str;
+
+        // Torque
+        rb_forces.torque = (upright_torque + rotate_torque).into();
 
         if jump {
             rb_vel.apply_impulse(rb_mprops, Vec3::new(0.0, settings.jump_str, 0.0).into());
